@@ -11,6 +11,7 @@ DELIMITER = "---"
 _TRUE = "true"
 _FALSE = "false"
 _NULLS = ("", "null", "~")
+_ESCAPE = "\\"
 
 
 def split_document(text: str) -> tuple[str | None, str]:
@@ -72,7 +73,9 @@ def _parse_scalar(value: str) -> object:
         if not inner:
             return []
         return [_parse_scalar(item) for item in _split_items(inner)]
-    if len(value) > 1 and value[0] == value[-1] and value[0] in ("'", '"'):
+    if len(value) > 1 and value[0] == value[-1] == '"':
+        return _unescape(value[1:-1])
+    if len(value) > 1 and value[0] == value[-1] == "'":
         return value[1:-1]
     lowered = value.lower()
     if lowered == _TRUE:
@@ -95,10 +98,15 @@ def _split_items(inner: str) -> list[str]:
     items: list[str] = []
     current: list[str] = []
     quote: str | None = None
+    escaped = False
     at_value_start = True
     for char in inner:
         if quote:
-            if char == quote:
+            if escaped:
+                escaped = False
+            elif quote == '"' and char == _ESCAPE:
+                escaped = True
+            elif char == quote:
                 quote = None
             current.append(char)
             at_value_start = False
@@ -133,6 +141,25 @@ def _render_scalar(value: object) -> str:
     if isinstance(value, (int, float)):
         return repr(value)
     text = str(value)
-    if text != text.strip() or any(char in text for char in ":#[]{},") or text == "":
-        return '"' + text.replace('"', '\\"') + '"'
+    if (
+        any(char in text for char in ":#[]{},")
+        or text[:1] in ("'", '"')
+        or _parse_scalar(text) != text
+    ):
+        return '"' + _escape(text) + '"'
     return text
+
+
+def _escape(text: str) -> str:
+    return text.replace(_ESCAPE, _ESCAPE * 2).replace('"', _ESCAPE + '"')
+
+
+def _unescape(text: str) -> str:
+    chars: list[str] = []
+    index = 0
+    while index < len(text):
+        if text[index] == _ESCAPE and text[index + 1 : index + 2] in (_ESCAPE, '"'):
+            index += 1
+        chars.append(text[index])
+        index += 1
+    return "".join(chars)
