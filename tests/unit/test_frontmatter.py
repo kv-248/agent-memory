@@ -142,3 +142,21 @@ def test_escaped_quote_written_by_earlier_renders_reads_as_a_quote():
 def test_a_lone_backslash_written_by_earlier_renders_is_kept(raw, expected):
     fields, _ = frontmatter.parse(f"---\nabstract: {raw}\n---\nbody\n")
     assert fields["abstract"] == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ('["C:\\", next]', ["C:\\", "next"]),
+        ('["C:\\", "x"]', ["C:\\", "x"]),
+    ],
+)
+def test_inline_array_with_a_lone_backslash_from_earlier_renders_splits(raw, expected):
+    fields, _ = frontmatter.parse(f"---\nlinks: {raw}\n---\nbody\n")
+    assert fields["links"] == expected
+
+
+def test_inline_array_item_containing_quote_comma_round_trips():
+    links = ['a", b', "next", 'C:\\", "x']
+    parsed, _ = _round_trip({"links": links}, "body")
+    assert parsed["links"] == links

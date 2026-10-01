@@ -95,6 +95,29 @@ def _parse_scalar(value: str) -> object:
 
 
 def _split_items(inner: str) -> list[str]:
+    items = _split_items_with(inner, escapes=True)
+    if items is not None and all(_is_whole_item(item) for item in items):
+        return items
+    # Earlier renders did not escape backslashes, so a legacy item such as "C:\" reads
+    # as an unterminated quote here; fall back to the escape-unaware split they used.
+    return _split_items_with(inner, escapes=False) or []
+
+
+def _is_whole_item(item: str) -> bool:
+    if not item.startswith('"'):
+        return True
+    escaped = False
+    for index, char in enumerate(item[1:], start=1):
+        if escaped:
+            escaped = False
+        elif char == _ESCAPE:
+            escaped = True
+        elif char == '"':
+            return index == len(item) - 1
+    return False
+
+
+def _split_items_with(inner: str, *, escapes: bool) -> list[str] | None:
     items: list[str] = []
     current: list[str] = []
     quote: str | None = None
@@ -104,7 +127,7 @@ def _split_items(inner: str) -> list[str]:
         if quote:
             if escaped:
                 escaped = False
-            elif quote == '"' and char == _ESCAPE:
+            elif escapes and quote == '"' and char == _ESCAPE:
                 escaped = True
             elif char == quote:
                 quote = None
@@ -127,6 +150,8 @@ def _split_items(inner: str) -> list[str]:
         else:
             current.append(char)
             at_value_start = False
+    if escapes and quote:
+        return None
     items.append("".join(current))
     return [item for item in (item.strip() for item in items) if item]
 
