@@ -151,14 +151,14 @@ def _render_scalar(value: object) -> str:
 
 
 def _escape(text: str) -> str:
-    return text.replace(_ESCAPE, _ESCAPE * 2).replace('"', _ESCAPE + '"')
+    return text.replace(_ESCAPE, _ESCAPE + _ESCAPE).replace('"', _ESCAPE + '"')
 
 
 def _unescape(text: str) -> str:
     chars: list[str] = []
     index = 0
     while index < len(text):
-        if text[index] == _ESCAPE and text[index + 1 : index + 2] in (_ESCAPE, '"'):
+        if text.startswith((_ESCAPE + _ESCAPE, _ESCAPE + '"'), index):
             index += 1
         chars.append(text[index])
         index += 1
