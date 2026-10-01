@@ -128,3 +128,17 @@ def test_escaped_quote_written_by_earlier_renders_reads_as_a_quote():
     text = '---\nabstract: "Note: he said \\"hi\\""\n---\nbody\n'
     fields, _ = frontmatter.parse(text)
     assert fields["abstract"] == 'Note: he said "hi"'
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ('"C:\\"', "C:\\"),
+        ('"C:\\tmp, x"', "C:\\tmp, x"),
+        ('"C:\\tmp: x"', "C:\\tmp: x"),
+        ('"ends with \\"', "ends with \\"),
+    ],
+)
+def test_a_lone_backslash_written_by_earlier_renders_is_kept(raw, expected):
+    fields, _ = frontmatter.parse(f"---\nabstract: {raw}\n---\nbody\n")
+    assert fields["abstract"] == expected
