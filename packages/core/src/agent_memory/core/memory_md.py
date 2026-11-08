@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pathlib
+
 from .config import Config
 from .paths import StoreLayout
 from .record import MemoryRecord
@@ -40,7 +42,13 @@ def write(layout: StoreLayout, records: list[MemoryRecord]) -> str:
 
 
 def _line(record: MemoryRecord, root: str) -> str:
-    location = str(record.path)
-    if root and location.startswith(root):
-        location = location[len(root) :].lstrip("/")
-    return f"- [{record.name}]({location}) — {record.abstract}\n"
+    return f"- [{record.name}]({_location(record.path, root)}) — {record.abstract}\n"
+
+
+def _location(path: pathlib.Path | None, root: str) -> str:
+    if path is None or not root:
+        return str(path)
+    try:
+        return path.relative_to(type(path)(root)).as_posix()
+    except ValueError:
+        return str(path)

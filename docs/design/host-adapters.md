@@ -69,9 +69,11 @@ the worker; failure never falls back to another transport. On a fresh Host-backe
 successful Host setup also supplies the default Manage policy. Explicit operation policies and
 legacy endpoint configuration are preserved.
 
-Hosts run on POSIX and on native Windows with one contract. Writer, coordination and
-observation locks keep the same shared/exclusive semantics on both; on Windows they occupy a
-byte range beyond any real file content, so a held lock never blocks ordinary reads or appends.
+Hosts run on POSIX and on native Windows with one contract. The injected root index names
+each memory with a store-relative POSIX path, and only when that file is inside the store, so
+a Windows checkout stays readable on POSIX. Writer, coordination and observation locks keep
+the same shared/exclusive semantics on both; on Windows they occupy a byte range beyond any
+real file content, so a held lock never blocks ordinary reads or appends.
 Every entry point exchanges UTF-8 on stdio regardless of the platform code page, so
 non-ASCII memories survive pipes. Every hook is bounded by its configured timeout and exits
 cleanly. Detached distillation and
