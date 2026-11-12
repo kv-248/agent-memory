@@ -103,28 +103,38 @@ class SearchIndex:
         surface: str = SURFACE_ACTIVE,
         *,
         scope_path: str | None = None,
+        valid_at: str | None = None,
     ) -> list[Candidate]:
         if surface not in SURFACES:
             raise ValueError(f"unknown surface {surface}")
         expression = to_match_query(query, self._tokenizer)
         if not expression or scope_path == "":
             return []
-        if scope_path is None:
+        if scope_path is None and valid_at is None:
             statement = (
                 f"SELECT name, kind, anchor, heading, bm25({surface}) AS rank FROM {surface} "
                 f"WHERE {surface} MATCH ? ORDER BY rank LIMIT ?"
             )
             parameters: tuple[object, ...] = (expression, pool)
         else:
-            prefix = scope_path + "/"
+            filters = [f"{surface} MATCH ?"]
+            values: list[object] = [expression]
+            if scope_path is not None:
+                prefix = scope_path + "/"
+                filters.append("(records.path = ? OR substr(records.path, 1, ?) = ?)")
+                values.extend((scope_path, len(prefix), prefix))
+            if valid_at is not None:
+                filters.append(
+                    "records.valid_from <= ? "
+                    "AND (records.invalid_at IS NULL OR records.invalid_at > ?)"
+                )
+                values.extend((valid_at, valid_at))
             statement = (
                 f"SELECT {surface}.name, kind, anchor, heading, bm25({surface}) AS rank "
                 f"FROM {surface} JOIN records ON records.name = {surface}.name "
-                f"WHERE {surface} MATCH ? "
-                "AND (records.path = ? OR substr(records.path, 1, ?) = ?) "
-                "ORDER BY rank LIMIT ?"
+                f"WHERE {' AND '.join(filters)} ORDER BY rank LIMIT ?"
             )
-            parameters = (expression, scope_path, len(prefix), prefix, pool)
+            parameters = (*values, pool)
         rows = self._connection.execute(statement, parameters).fetchall()
         return [
             Candidate(

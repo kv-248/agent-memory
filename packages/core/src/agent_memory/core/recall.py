@@ -95,12 +95,15 @@ class Recall:
         scope_path = (
             "/".join(pathlib.PurePath(scope.strip("/\\")).parts) if scope else None
         )
+        valid_at = timestamp.canonical(as_of) if as_of is not None else None
         with self._database.connect() as connection:
             index = SearchIndex(connection, self._config.index.tokenizer)
-            candidates = index.match(query, pool, SURFACE_ACTIVE, scope_path=scope_path)
+            candidates = index.match(
+                query, pool, SURFACE_ACTIVE, scope_path=scope_path, valid_at=valid_at
+            )
             if as_of is not None:
                 candidates = candidates + index.match(
-                    query, pool, SURFACE_HISTORY, scope_path=scope_path
+                    query, pool, SURFACE_HISTORY, scope_path=scope_path, valid_at=valid_at
                 )
             eligible = self._eligible(index.rows(), scope=scope, as_of=as_of)
             if self._config.index.vector_enabled:

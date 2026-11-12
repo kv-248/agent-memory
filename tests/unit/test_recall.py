@@ -116,6 +116,73 @@ def test_scope_filters_matches_before_the_candidate_pool_is_truncated(store):
     assert _names(hits) == ["inside-scopeprobe"]
 
 
+def test_as_of_filters_matches_before_the_candidate_pool_is_truncated(store):
+    pool = store.config.recall.candidate_pool_multiplier
+    specs = [
+        {
+            "abstract": "asofprobe asofprobe asofprobe",
+            "type": "decision",
+            "fields": {"project": f"later-{index}"},
+            "name": f"later-{index}",
+            "valid_from": "2026-02-01",
+        }
+        for index in range(pool + 1)
+    ]
+    specs.append(
+        {
+            "abstract": "asofprobe",
+            "type": "decision",
+            "fields": {"project": "then"},
+            "name": "then-asofprobe",
+            "valid_from": "2026-01-01",
+        }
+    )
+    assert not store.record_many(specs).rejected
+
+    hits = Recall(store).recall("asofprobe", as_of="2026-01-15T00:00:00Z", limit=1)
+
+    assert _names(hits) == ["then-asofprobe"]
+
+
+def test_as_of_filters_historical_matches_before_the_candidate_pool_is_truncated(store):
+    pool = store.config.recall.candidate_pool_multiplier
+    store.record(
+        abstract="histprobe",
+        type="decision",
+        fields={"project": "then"},
+        name="then-histprobe",
+        valid_from="2026-01-01",
+    )
+    store.record(
+        abstract="successor of the memory that was current in January",
+        type="decision",
+        fields={"project": "then"},
+        name="then-histprobe-next",
+        valid_from="2026-02-01",
+        supersedes="then-histprobe",
+    )
+    for index in range(pool + 1):
+        store.record(
+            abstract="histprobe histprobe histprobe",
+            type="decision",
+            fields={"project": f"old-{index}"},
+            name=f"old-{index}",
+            valid_from="2025-01-01",
+        )
+        store.record(
+            abstract="successor that already replaced the older note",
+            type="decision",
+            fields={"project": f"old-{index}"},
+            name=f"old-next-{index}",
+            valid_from="2025-06-01",
+            supersedes=f"old-{index}",
+        )
+
+    hits = Recall(store).recall("histprobe", as_of="2026-01-15T00:00:00Z", limit=1)
+
+    assert _names(hits) == ["then-histprobe"]
+
+
 def test_scope_applies_to_historical_candidates(store, clock):
     store.record(
         abstract="scopehistory",
