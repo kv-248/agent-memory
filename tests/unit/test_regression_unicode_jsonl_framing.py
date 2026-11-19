@@ -1,4 +1,7 @@
+import json
+
 import pytest
+from agent_memory.adapters import muse_session, transcript
 from agent_memory.core import sessions
 from agent_memory.core.pending import Pending
 
@@ -30,3 +33,46 @@ def test_executor_operations_and_verdicts_keep_unicode_separators(store, separat
         {"proposal": "fixture", "verdict": "reject", "text": text}, ensure_ascii=False
     )
     assert reasoning.parse(verdict)[0].text == text
+
+
+@pytest.mark.parametrize("separator", ["\u2028", "\u2029", "\u0085"])
+def test_a_host_transcript_record_keeps_unicode_line_separators(tmp_path, separator):
+    text = "before" + separator + "after"
+    record = json.dumps(
+        {"type": "user", "message": {"role": "user", "content": text}},
+        ensure_ascii=False,
+    )
+    following = json.dumps({"role": "assistant", "content": "done"})
+    path = tmp_path / "transcript.jsonl"
+    path.write_text(record + "\r\n" + following + "\n", encoding="utf-8")
+
+    assert transcript.items(path) == [f"user: {text}", "assistant: done"]
+
+
+@pytest.mark.parametrize("separator", ["\u2028", "\u2029", "\u0085"])
+def test_a_muse_transcript_record_keeps_unicode_line_separators(tmp_path, separator):
+    text = "before" + separator + "after"
+    record = json.dumps(
+        {
+            "payload": {
+                "kind": "run",
+                "event": {"kind": "started", "prompt": text},
+            }
+        },
+        ensure_ascii=False,
+    )
+    following = json.dumps(
+        {
+            "payload": {
+                "kind": "run",
+                "event": {
+                    "kind": "assistant_message_committed",
+                    "text": "done",
+                },
+            }
+        }
+    )
+    path = tmp_path / "session.jsonl"
+    path.write_text(record + "\n" + following + "\n", encoding="utf-8")
+
+    assert muse_session.items(path) == [f"user: {text}", "assistant: done"]
